@@ -54,8 +54,8 @@ export default function AddToCartPopup() {
   // Cleanup on unmount
   useEffect(() => () => clearAll(), [clearAll]);
 
-  const handleCheckout = () => { hide(); router.push("/checkout"); };
-  const handleCart = () => { hide(); router.push("/cart"); };
+  const handleCheckout = () => { hide(); window.scrollTo(0, 0); router.push("/checkout"); };
+  const handleCart = () => { hide(); window.scrollTo(0, 0); router.push("/cart"); };
 
   return (
     <AnimatePresence>
