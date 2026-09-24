@@ -311,15 +311,19 @@ function RegisterForm({
   onSuccess,
   savedState,
   onStateChange,
+  onSwitchToLogin,
 }: {
   onSuccess: (user: object) => void;
   savedState: RegisterState;
   onStateChange: (s: Partial<RegisterState>) => void;
+  onSwitchToLogin?: (email?: string) => void;
 }) {
   const { step, firstName, lastName, phone, email, password } = savedState;
   const setStep = (v: "form" | "otp") => onStateChange({ step: v });
 
   const [showPass, setShowPass] = useState(false);
+  const [hasSentOtpBefore, setHasSentOtpBefore] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState("");
 
   // live errors — keyed by field name
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -331,16 +335,16 @@ function RegisterForm({
   // OTP
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [otpError, setOtpError] = useState("");
-
   const [loading, setLoading] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Resilient countdown hook
+  const { seconds: cooldown, start: startCooldown, clear: clearCooldown } = useCountdown("auth_reg_otp_cooldown");
+
   const emailDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstNameRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (step === "form") setTimeout(() => firstNameRef.current?.focus(), 100);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [step]);
 
   // ── Live field validators ─────────────────────────────────────────────────
@@ -371,6 +375,14 @@ function RegisterForm({
         lastCheckedEmailRef.current = trimmed;
         if (data.exists) {
           setErrors((prev) => ({ ...prev, email: "هذا البريد الإلكتروني مسجل مسبقًا" }));
+        } else {
+          setErrors((prev) => {
+            if (prev.email === "هذا البريد الإلكتروني مسجل مسبقًا") {
+              const { email: _, ...rest } = prev;
+              return rest;
+            }
+            return prev;
+          });
         }
       } catch { /* fail open */ } finally {
         setEmailChecking(false);
@@ -405,17 +417,6 @@ function RegisterForm({
     return valid;
   };
 
-  const startCooldown = useCallback((seconds: number = COOLDOWN_SECONDS) => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setCooldown(seconds);
-    timerRef.current = setInterval(() => {
-      setCooldown((c) => {
-        if (c <= 1) { clearInterval(timerRef.current!); timerRef.current = null; return 0; }
-        return c - 1;
-      });
-    }, 1000);
-  }, []);
-
   const handleSendOtp = async () => {
     if (!validateAll()) return;
     setGlobalError("");
@@ -443,6 +444,8 @@ function RegisterForm({
         }
         return;
       }
+      setHasSentOtpBefore(true);
+      setResendSuccess("");
       onStateChange({ step: "otp" });
       startCooldown(data.cooldown || COOLDOWN_SECONDS);
     } catch {
@@ -478,6 +481,7 @@ function RegisterForm({
         }
         return;
       }
+      clearCooldown();
       onSuccess(data.user);
     } catch {
       setOtpError("حدث خطأ، حاول مرة أخرى");
@@ -490,6 +494,7 @@ function RegisterForm({
     if (cooldown > 0 || loading) return;
     setOtp(["", "", "", "", "", ""]);
     setOtpError("");
+    setResendSuccess("");
     setLoading(true);
     try {
       const res = await fetch("/api/auth/register/request", {
@@ -509,6 +514,7 @@ function RegisterForm({
         if (data.cooldown) startCooldown(data.cooldown);
         return;
       }
+      setResendSuccess("تم إرسال رمز تحقق جديد إلى بريدك بنجاح");
       startCooldown(data.cooldown || COOLDOWN_SECONDS);
     } catch {
       setOtpError("حدث خطأ، حاول مرة أخرى");
@@ -517,33 +523,92 @@ function RegisterForm({
     }
   };
 
-  const maskedEmail = email
-    ? email.replace(/(.{2})(.*)(@.*)/, (_, a, b, c) => a + "*".repeat(Math.min(b.length, 4)) + c)
-    : "";
-
   if (step === "otp") {
     return (
-      <div className="space-y-5">
-        <div className="text-center space-y-1">
-          <p className="text-base font-semibold" style={{ color: "var(--color-2)" }}>تحقق من بريدك الإلكتروني</p>
-          <p className="text-sm" style={{ color: "var(--color-3)" }}>أرسلنا رمز تحقق مكوّن من 6 أرقام إلى</p>
-          <p className="text-sm font-semibold" style={{ color: "var(--color-4)" }} dir="ltr">{maskedEmail}</p>
+      <div className="space-y-6">
+        <div className="flex flex-col items-center text-center space-y-2">
+          <div className="w-14 h-14 rounded-full bg-[#284064]/10 text-[#284064] flex items-center justify-center mb-1">
+            <Mail className="w-7 h-7" />
+          </div>
+          <p className="text-lg font-bold text-[#284064]">تحقق من بريدك الإلكتروني</p>
+          <p className="text-xs text-gray-500">
+            أدخل رمز التحقق المكوّن من 6 أرقام المرسل إلى:
+          </p>
+          <div className="inline-flex items-center gap-2.5 px-3 py-1.5 bg-gray-50 border border-gray-200 mt-1">
+            <span className="text-sm font-semibold text-[#284064]" dir="ltr">{email}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setStep("form");
+                setResendSuccess("");
+                setOtpError("");
+              }}
+              className="text-xs text-[#9a6d38] hover:text-[#284064] font-medium underline inline-flex items-center gap-1 transition-colors"
+              title="تعديل البيانات"
+            >
+              <Pencil className="w-3 h-3" />
+              <span>تعديل</span>
+            </button>
+          </div>
         </div>
 
-        <OtpInputs otp={otp} setOtp={setOtp} error={otpError} setError={setOtpError} onComplete={handleVerifyOtp} />
-        {otpError && <p className="text-xs text-red-500 text-center">{otpError}</p>}
+        {resendSuccess && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs px-3.5 py-2.5 flex items-center gap-2 justify-center text-center">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+            <span>{resendSuccess}</span>
+          </div>
+        )}
+
+        <OtpInputs
+          otp={otp}
+          setOtp={setOtp}
+          error={otpError}
+          setError={setOtpError}
+          onComplete={handleVerifyOtp}
+          disabled={loading}
+        />
+
+        {otpError && (
+          <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-3 py-2 text-center">
+            {otpError}
+          </div>
+        )}
 
         <Btn onClick={handleVerifyOtp} loading={loading} disabled={otp.join("").length < 6}>
           إنشاء الحساب والدخول
         </Btn>
 
-        <div className="flex items-center justify-between text-xs pt-1 border-t" style={{ color: "var(--color-3)", borderColor: "var(--color-1)" }}>
-          <button onClick={() => { setStep("form"); setOtp(["", "", "", "", "", ""]); setOtpError(""); }} className="transition-colors font-medium hover:opacity-70">
-            تعديل البيانات
+        <div className="flex items-center justify-between text-xs pt-3 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={() => {
+              setStep("form");
+              setResendSuccess("");
+              setOtpError("");
+            }}
+            className="text-[#284064] hover:text-[#9a6d38] font-medium transition-colors inline-flex items-center gap-1"
+          >
+            <span>تعديل البيانات</span>
           </button>
-          <button onClick={handleResend} disabled={cooldown > 0 || loading} className="transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-70">
-            {cooldown > 0 ? `إعادة الإرسال (${cooldown}ث)` : "إعادة إرسال الرمز"}
-          </button>
+
+          {cooldown > 0 ? (
+            <span className="text-gray-500 bg-gray-50 border border-gray-200 px-2.5 py-1 font-mono text-xs">
+              إعادة الإرسال بعد ({formatTimer(cooldown)})
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={handleResend}
+              disabled={loading}
+              className="text-[#284064] hover:text-[#9a6d38] font-semibold transition-colors underline disabled:opacity-50"
+            >
+              لم يصلك الرمز؟ إعادة الإرسال
+            </button>
+          )}
+        </div>
+
+        <div className="bg-slate-50 border border-slate-200/70 p-3 text-[11px] text-gray-500 leading-relaxed text-center">
+          💡 لم يصلك الرمز؟ يرجى فحص مجلد الرسائل غير المرغوب فيها (Spam / Junk) أو التأكد من كتابة البريد بشكل صحيح.
         </div>
       </div>
     );
@@ -562,7 +627,6 @@ function RegisterForm({
     }
   ) => {
     const err = touched[name] ? errors[name] : "";
-    const isOk = touched[name] && !err && value.length > 0;
     const checking = name === "email" && emailChecking;
     return (
       <div className="space-y-1.5">
@@ -615,6 +679,23 @@ function RegisterForm({
 
   return (
     <div className="space-y-4">
+      {hasSentOtpBefore && (
+        <div className="bg-slate-50 border border-slate-200 p-3 flex items-center justify-between gap-3 text-xs text-[#284064]">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="font-medium">جارٍ تعديل بيانات الحساب.</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setStep("otp"); setOtpError(""); }}
+            className="font-bold text-[#284064] hover:text-[#9a6d38] underline transition-colors inline-flex items-center gap-1"
+          >
+            <span>العودة لإدخال الرمز</span>
+            <ArrowLeft className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {globalError && (
         <div className="bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-3">
           {globalError}
@@ -638,11 +719,29 @@ function RegisterForm({
         dir: "ltr", autoComplete: "tel", inputMode: "tel",
       })}
 
-      {liveInput("email", email, {
-        label: "البريد الإلكتروني", id: "reg-email",
-        type: "email", placeholder: "xyz@example.com",
-        dir: "ltr", autoComplete: "email", inputMode: "email",
-      })}
+      <div>
+        {liveInput("email", email, {
+          label: "البريد الإلكتروني", id: "reg-email",
+          type: "email", placeholder: "xyz@example.com",
+          dir: "ltr", autoComplete: "email", inputMode: "email",
+        })}
+        {errors.email === "هذا البريد الإلكتروني مسجل مسبقًا" && onSwitchToLogin && (
+          <div className="p-3 bg-amber-50 border border-amber-200 text-xs text-amber-900 space-y-2 mt-2">
+            <div className="flex items-center gap-1.5 font-medium">
+              <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span>هذا البريد الإلكتروني مسجل لدينا بالفعل. هل تود تسجيل الدخول؟</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => onSwitchToLogin(email)}
+              className="px-3 py-1.5 bg-[#284064] text-white font-medium hover:bg-[#1e3250] transition-colors text-xs inline-flex items-center gap-1.5"
+            >
+              <span>الانتقال لتسجيل الدخول بهذا البريد</span>
+              <ArrowLeft className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Password — special: has show/hide button as suffix */}
       {liveInput("password", password, {
@@ -663,7 +762,7 @@ function RegisterForm({
       })}
 
       <Btn onClick={handleSendOtp} loading={loading} disabled={emailChecking}>
-        إرسال رمز التحقق
+        {hasSentOtpBefore ? "تحديث البيانات وإرسال رمز تحقق" : "إرسال رمز التحقق"}
       </Btn>
     </div>
   );
