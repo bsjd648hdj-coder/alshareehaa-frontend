@@ -3,10 +3,63 @@
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
+import { Mail, CheckCircle2, Pencil, ArrowLeft, RefreshCw, AlertCircle, ArrowRight } from "lucide-react";
 import { useAuthStore } from "../store/authStore";
 import { identify, track } from "../lib/useTikTokEvents";
 
 const COOLDOWN_SECONDS = 60;
+
+// ─── Timestamp-based resilient countdown hook ─────────────────────────────────
+function useCountdown(storageKey: string) {
+  const [seconds, setSeconds] = useState(0);
+
+  useEffect(() => {
+    const update = () => {
+      try {
+        const stored = sessionStorage.getItem(storageKey);
+        if (!stored) {
+          setSeconds(0);
+          return;
+        }
+        const expiresAt = parseInt(stored, 10);
+        const remaining = Math.max(0, Math.ceil((expiresAt - Date.now()) / 1000));
+        setSeconds(remaining);
+        if (remaining <= 0) {
+          sessionStorage.removeItem(storageKey);
+        }
+      } catch {
+        setSeconds(0);
+      }
+    };
+
+    update();
+    const interval = setInterval(update, 500);
+    return () => clearInterval(interval);
+  }, [storageKey]);
+
+  const start = useCallback((cooldownSeconds: number = COOLDOWN_SECONDS) => {
+    const expiresAt = Date.now() + cooldownSeconds * 1000;
+    try {
+      sessionStorage.setItem(storageKey, String(expiresAt));
+    } catch {}
+    setSeconds(cooldownSeconds);
+  }, [storageKey]);
+
+  const clear = useCallback(() => {
+    try {
+      sessionStorage.removeItem(storageKey);
+    } catch {}
+    setSeconds(0);
+  }, [storageKey]);
+
+  return { seconds, start, clear };
+}
+
+function formatTimer(totalSeconds: number) {
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
 
 // ─── OTP input component ──────────────────────────────────────────────────────
 function OtpInputs({
@@ -15,21 +68,59 @@ function OtpInputs({
   error,
   setError,
   onComplete,
+  disabled,
 }: {
   otp: string[];
   setOtp: (v: string[]) => void;
   error: string;
   setError: (v: string) => void;
   onComplete?: () => void;
+  disabled?: boolean;
 }) {
   const refs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // Focus first empty input on mount
+  useEffect(() => {
+    const firstEmptyIndex = otp.findIndex((d) => !d);
+    const targetIndex = firstEmptyIndex === -1 ? 5 : firstEmptyIndex;
+    refs.current[targetIndex]?.focus();
+  }, []);
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    if (disabled) return;
+    const text = e.clipboardData.getData("text");
+    const digits = text.replace(/\D/g, "").slice(0, 6);
+    if (!digits) return;
+    const next = [...otp];
+    for (let i = 0; i < 6; i++) {
+      next[i] = digits[i] || "";
+    }
+    setOtp(next);
+    setError("");
+    const targetFocus = Math.min(digits.length, 5);
+    refs.current[targetFocus]?.focus();
+    if (digits.length === 6) {
+      setTimeout(() => onComplete?.(), 50);
+    }
+  };
+
   const handleChange = (index: number, value: string) => {
+    if (disabled) return;
     if (value.length > 1) {
       const digits = value.replace(/\D/g, "").slice(0, 6);
-      if (digits.length === 6) {
-        setOtp(digits.split(""));
-        refs.current[5]?.focus();
+      if (digits.length > 0) {
+        const next = [...otp];
+        for (let i = 0; i < digits.length; i++) {
+          if (index + i < 6) next[index + i] = digits[i];
+        }
+        setOtp(next);
+        setError("");
+        const nextFocus = Math.min(index + digits.length, 5);
+        refs.current[nextFocus]?.focus();
+        if (next.every((d) => d.length === 1)) {
+          setTimeout(() => onComplete?.(), 50);
+        }
         return;
       }
     }
@@ -38,13 +129,32 @@ function OtpInputs({
     next[index] = digit;
     setOtp(next);
     setError("");
-    if (digit && index < 5) refs.current[index + 1]?.focus();
+    if (digit) {
+      if (index < 5) refs.current[index + 1]?.focus();
+      if (next.every((d) => d.length === 1)) {
+        setTimeout(() => onComplete?.(), 50);
+      }
+    }
   };
 
-  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === "Backspace" && !otp[index] && index > 0)
-      refs.current[index - 1]?.focus();
-    if (e.key === "Enter" && otp.join("").length === 6) onComplete?.();
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace") {
+      if (!otp[index] && index > 0) {
+        e.preventDefault();
+        const next = [...otp];
+        next[index - 1] = "";
+        setOtp(next);
+        refs.current[index - 1]?.focus();
+      }
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      if (index > 0) refs.current[index - 1]?.focus();
+    } else if (e.key === "ArrowRight") {
+      e.preventDefault();
+      if (index < 5) refs.current[index + 1]?.focus();
+    } else if (e.key === "Enter" && otp.every((d) => d.length === 1)) {
+      onComplete?.();
+    }
   };
 
   return (
@@ -55,20 +165,23 @@ function OtpInputs({
           ref={(el) => { refs.current[i] = el; }}
           type="text"
           inputMode="numeric"
+          pattern="[0-9]*"
           autoComplete={i === 0 ? "one-time-code" : "off"}
           maxLength={6}
+          disabled={disabled}
           value={digit}
+          onPaste={handlePaste}
           onChange={(e) => handleChange(i, e.target.value)}
           onKeyDown={(e) => handleKeyDown(i, e)}
           onFocus={(e) => e.target.select()}
           style={{ borderRadius: 0 }}
-          className={`w-11 h-12 text-center text-xl font-bold border-2 transition-colors focus:outline-none ${
+          className={`w-11 sm:w-12 h-13 sm:h-14 text-center text-xl sm:text-2xl font-bold border-2 transition-all focus:outline-none ${
             error
-              ? "border-red-400 bg-red-50 text-red-600"
+              ? "border-red-400 bg-red-50 text-red-600 shadow-sm"
               : digit
-              ? "border-[#284064] text-[#284064]"
-              : "border-[#8BA8D2] focus:border-[#284064]"
-          }`}
+              ? "border-[#284064] bg-[#284064]/5 text-[#284064]"
+              : "border-[#8BA8D2] focus:border-[#284064] focus:ring-1 focus:ring-[#284064]"
+          } ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
         />
       ))}
     </div>
