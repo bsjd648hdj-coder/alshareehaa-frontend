@@ -55,7 +55,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
     // عرض الـ cache فوراً لتجنب الـ flicker
     const cached = readCache();
-    if (cached) set({ user: cached, loading: false });
+    // سواء فيه cache أو لأ، نوقف الـ loading spinner فوراً
+    set({ user: cached ?? null, loading: false });
 
     try {
       const res = await fetch("/api/auth/me");
@@ -72,6 +73,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     writeCache(null);
     try { sessionStorage.removeItem("auth_register_draft"); } catch { /* ignore */ }
-    set({ user: null, initialized: false, loading: false });
+    // initialized: true عشان fetchMe ميشتغلش تاني بعد الـ logout
+    // الـ user = null كافي يخلي صفحة الـ auth تظهر فوراً
+    set({ user: null, initialized: true, loading: false });
   },
 }));
