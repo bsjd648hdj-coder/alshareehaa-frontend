@@ -21,7 +21,10 @@ export async function POST(req: NextRequest) {
 
     const backendRes = await fetch(`${BACKEND}/api/customers/auth/forgot/verify`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-internal-secret": process.env.INTERNAL_SECRET || "",
+      },
       body: JSON.stringify({ email, otp, newPassword }),
     });
 
