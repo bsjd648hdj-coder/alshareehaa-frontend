@@ -8,7 +8,10 @@ export async function POST(req: NextRequest) {
 
     await fetch(`${BACKEND}/api/customers/auth/logout`, {
       method: "POST",
-      headers: { cookie },
+      headers: {
+        cookie,
+        "x-internal-secret": process.env.INTERNAL_SECRET || "",
+      },
     }).catch(() => {});
 
     const res = NextResponse.json({ ok: true });

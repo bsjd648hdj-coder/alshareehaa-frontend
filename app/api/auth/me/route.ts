@@ -13,7 +13,10 @@ export async function GET(req: NextRequest) {
     const cookie = req.headers.get("cookie") || "";
 
     const backendRes = await fetch(`${BACKEND}/api/customers/auth/me`, {
-      headers: { cookie },
+      headers: {
+        cookie,
+        "x-internal-secret": process.env.INTERNAL_SECRET || "",
+      },
       signal: AbortSignal.timeout(3000),
     });
 
