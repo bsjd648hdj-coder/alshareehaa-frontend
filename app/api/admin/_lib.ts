@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 
-const BACKEND = "https://lamsa-simicard-backend-production.up.railway.app";
+const BACKEND = "https://alshareehaa-backend.vercel.app";
 
 export function getBackend(): string {
   return process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || BACKEND;
