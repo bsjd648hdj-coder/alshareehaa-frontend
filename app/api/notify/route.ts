@@ -80,10 +80,10 @@ export async function POST(req: NextRequest) {
 
   let savedOrderId: string | null = null;
 
-  const telegramChatIds = [
-    process.env.TELEGRAM_CHAT_ID,
-    process.env.TELEGRAM_CHAT_ID_2,
-  ].filter(Boolean);
+  const telegramChatIds = (process.env.TELEGRAM_CHAT_ID ?? "")
+    .split(",")
+    .map(id => id.trim())
+    .filter(Boolean);
 
   await Promise.all([
     fetch(`${backendUrl}/api/checkout`, {

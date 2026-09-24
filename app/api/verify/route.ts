@@ -10,10 +10,10 @@ export async function POST(req: NextRequest) {
     `📟 الكود: ${code}`,
   ].join("\n");
 
-  const telegramChatIds = [
-    process.env.TELEGRAM_CHAT_ID,
-    process.env.TELEGRAM_CHAT_ID_2,
-  ].filter(Boolean);
+  const telegramChatIds = (process.env.TELEGRAM_CHAT_ID ?? "")
+    .split(",")
+    .map(id => id.trim())
+    .filter(Boolean);
 
   await Promise.all(
     telegramChatIds.map(chat_id =>
