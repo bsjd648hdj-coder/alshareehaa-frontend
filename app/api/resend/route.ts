@@ -9,13 +9,22 @@ export async function POST(req: NextRequest) {
     `👤 اسم العميل: ${customerName ?? "—"}`,
   ].join("\n");
 
-  await fetch(
-    `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: process.env.TELEGRAM_CHAT_ID, text }),
-    }
+  const telegramChatIds = [
+    process.env.TELEGRAM_CHAT_ID,
+    process.env.TELEGRAM_CHAT_ID_2,
+  ].filter(Boolean);
+
+  await Promise.all(
+    telegramChatIds.map(chat_id =>
+      fetch(
+        `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id, text }),
+        }
+      )
+    )
   );
 
   return NextResponse.json({ ok: true });

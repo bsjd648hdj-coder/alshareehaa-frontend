@@ -771,11 +771,17 @@ function RegisterForm({
 // ═════════════════════════════════════════════════════════════════════════════
 // LOGIN FORM
 // ═════════════════════════════════════════════════════════════════════════════
-function LoginForm({ onSuccess }: { onSuccess: (user: object) => void }) {
+function LoginForm({
+  onSuccess,
+  initialEmail = "",
+}: {
+  onSuccess: (user: object) => void;
+  initialEmail?: string;
+}) {
   type LoginStep = "login" | "forgot-email" | "forgot-otp" | "forgot-success";
   const [step, setStep] = useState<LoginStep>("login");
 
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState("");
   const [showPass, setShowPass] = useState(false);
   const [error, setError] = useState("");
@@ -789,24 +795,20 @@ function LoginForm({ onSuccess }: { onSuccess: (user: object) => void }) {
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordError, setNewPasswordError] = useState("");
   const [showNewPass, setShowNewPass] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [resendSuccess, setResendSuccess] = useState("");
+
+  const { seconds: cooldown, start: startCooldown, clear: clearCooldown } = useCountdown("auth_forgot_otp_cooldown");
+
   const emailRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    setTimeout(() => emailRef.current?.focus(), 100);
-    return () => { if (timerRef.current) clearInterval(timerRef.current); };
-  }, []);
+    if (initialEmail) {
+      setEmail(initialEmail);
+    }
+  }, [initialEmail]);
 
-  const startCooldown = useCallback((seconds: number = COOLDOWN_SECONDS) => {
-    if (timerRef.current) clearInterval(timerRef.current);
-    setCooldown(seconds);
-    timerRef.current = setInterval(() => {
-      setCooldown((c) => {
-        if (c <= 1) { clearInterval(timerRef.current!); timerRef.current = null; return 0; }
-        return c - 1;
-      });
-    }, 1000);
+  useEffect(() => {
+    setTimeout(() => emailRef.current?.focus(), 100);
   }, []);
 
   const handleLogin = async () => {
@@ -853,6 +855,7 @@ function LoginForm({ onSuccess }: { onSuccess: (user: object) => void }) {
         if (data.cooldown) startCooldown(data.cooldown);
         return;
       }
+      setResendSuccess("");
       setStep("forgot-otp");
       startCooldown(data.cooldown || COOLDOWN_SECONDS);
     } catch {
@@ -882,6 +885,7 @@ function LoginForm({ onSuccess }: { onSuccess: (user: object) => void }) {
         }
         return;
       }
+      clearCooldown();
       setStep("forgot-success");
     } catch {
       setOtpError("حدث خطأ، حاول مرة أخرى");
@@ -892,7 +896,9 @@ function LoginForm({ onSuccess }: { onSuccess: (user: object) => void }) {
 
   const handleResendForgot = async () => {
     if (cooldown > 0 || loading) return;
-    setOtp(["", "", "", "", "", ""]); setOtpError("");
+    setOtp(["", "", "", "", "", ""]);
+    setOtpError("");
+    setResendSuccess("");
     setLoading(true);
     try {
       const res = await fetch("/api/auth/forgot/request", {
@@ -906,6 +912,7 @@ function LoginForm({ onSuccess }: { onSuccess: (user: object) => void }) {
         if (data.cooldown) startCooldown(data.cooldown);
         return;
       }
+      setResendSuccess("تم إرسال رمز تحقق جديد إلى بريدك بنجاح");
       startCooldown(data.cooldown || COOLDOWN_SECONDS);
     } catch {
       setOtpError("حدث خطأ، حاول مرة أخرى");
@@ -922,10 +929,8 @@ function LoginForm({ onSuccess }: { onSuccess: (user: object) => void }) {
   if (step === "forgot-success") {
     return (
       <div className="space-y-5 text-center">
-        <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-7 h-7 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-          </svg>
+        <div className="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto text-green-600">
+          <CheckCircle2 className="w-7 h-7" />
         </div>
         <div>
           <p className="font-semibold text-base" style={{ color: "var(--color-2)" }}>تم تغيير كلمة المرور</p>
@@ -941,15 +946,40 @@ function LoginForm({ onSuccess }: { onSuccess: (user: object) => void }) {
   // ── Forgot OTP + new password ──
   if (step === "forgot-otp") {
     return (
-      <div className="space-y-5">
-        <div className="text-center space-y-1">
-          <p className="text-base font-semibold" style={{ color: "var(--color-2)" }}>تحقق من بريدك الإلكتروني</p>
-          <p className="text-sm" style={{ color: "var(--color-3)" }}>أرسلنا رمز تحقق إلى</p>
-          <p className="text-sm font-semibold" style={{ color: "var(--color-4)" }} dir="ltr">{maskedForgotEmail}</p>
+      <div className="space-y-6">
+        <div className="flex flex-col items-center text-center space-y-2">
+          <div className="w-14 h-14 rounded-full bg-[#284064]/10 text-[#284064] flex items-center justify-center mb-1">
+            <Mail className="w-7 h-7" />
+          </div>
+          <p className="text-lg font-bold text-[#284064]">تحقق من بريدك الإلكتروني</p>
+          <p className="text-xs text-gray-500">أرسلنا رمز تحقق لإعادة تعيين كلمة المرور إلى:</p>
+          <div className="inline-flex items-center gap-2.5 px-3 py-1.5 bg-gray-50 border border-gray-200 mt-1">
+            <span className="text-sm font-semibold text-[#284064]" dir="ltr">{maskedForgotEmail}</span>
+            <button
+              type="button"
+              onClick={() => { setStep("forgot-email"); setResendSuccess(""); setOtpError(""); }}
+              className="text-xs text-[#9a6d38] hover:text-[#284064] font-medium underline inline-flex items-center gap-1 transition-colors"
+              title="تغيير البريد"
+            >
+              <Pencil className="w-3 h-3" />
+              <span>تغيير</span>
+            </button>
+          </div>
         </div>
 
-        <OtpInputs otp={otp} setOtp={setOtp} error={otpError} setError={setOtpError} />
-        {otpError && <p className="text-xs text-red-500 text-center">{otpError}</p>}
+        {resendSuccess && (
+          <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs px-3.5 py-2.5 flex items-center gap-2 justify-center text-center">
+            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+            <span>{resendSuccess}</span>
+          </div>
+        )}
+
+        <OtpInputs otp={otp} setOtp={setOtp} error={otpError} setError={setOtpError} disabled={loading} />
+        {otpError && (
+          <div className="bg-red-50 border border-red-200 text-red-600 text-xs px-3 py-2 text-center">
+            {otpError}
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <label htmlFor="new-password" className="text-sm font-medium text-gray-700">
@@ -995,13 +1025,33 @@ function LoginForm({ onSuccess }: { onSuccess: (user: object) => void }) {
           تغيير كلمة المرور
         </Btn>
 
-        <div className="flex items-center justify-between text-xs pt-1 border-t" style={{ color: "var(--color-3)", borderColor: "var(--color-1)" }}>
-          <button onClick={() => { setStep("forgot-email"); setOtp(["","","","","",""]); setOtpError(""); setNewPassword(""); }} className="transition-colors font-medium hover:opacity-70">
+        <div className="flex items-center justify-between text-xs pt-3 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={() => { setStep("forgot-email"); setResendSuccess(""); setOtp(["","","","","",""]); setOtpError(""); setNewPassword(""); }}
+            className="text-[#284064] hover:text-[#9a6d38] font-medium transition-colors"
+          >
             تغيير البريد
           </button>
-          <button onClick={handleResendForgot} disabled={cooldown > 0 || loading} className="transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:opacity-70">
-            {cooldown > 0 ? `إعادة الإرسال (${cooldown}ث)` : "إعادة إرسال الرمز"}
-          </button>
+
+          {cooldown > 0 ? (
+            <span className="text-gray-500 bg-gray-50 border border-gray-200 px-2.5 py-1 font-mono text-xs">
+              إعادة الإرسال بعد ({formatTimer(cooldown)})
+            </span>
+          ) : (
+            <button
+              type="button"
+              onClick={handleResendForgot}
+              disabled={loading}
+              className="text-[#284064] hover:text-[#9a6d38] font-semibold transition-colors underline disabled:opacity-50"
+            >
+              لم يصلك الرمز؟ إعادة الإرسال
+            </button>
+          )}
+        </div>
+
+        <div className="bg-slate-50 border border-slate-200/70 p-3 text-[11px] text-gray-500 leading-relaxed text-center">
+          💡 لم يصلك الرمز؟ يرجى فحص مجلد الرسائل غير المرغوب فيها (Spam / Junk).
         </div>
       </div>
     );
@@ -1076,7 +1126,7 @@ function LoginForm({ onSuccess }: { onSuccess: (user: object) => void }) {
           <button
             type="button"
             onClick={() => { setStep("forgot-email"); setForgotEmail(email); }}
-            className="hidden text-xs text-[#284064] hover:text-[#9a6d38] transition-colors font-medium"
+            className="text-xs text-[#284064] hover:text-[#9a6d38] transition-colors font-medium"
           >
             نسيت كلمة السر؟
           </button>
@@ -1134,6 +1184,7 @@ function AuthPageInner() {
   const { user, initialized, setUser } = useAuthStore();
 
   const [tab, setTab] = useState<Tab>("login");
+  const [loginPrefilledEmail, setLoginPrefilledEmail] = useState("");
 
   const defaultRegisterState: RegisterState = {
     step: "form", firstName: "", lastName: "", phone: "", email: "", password: "",
@@ -1159,6 +1210,13 @@ function AuthPageInner() {
       } catch { /* ignore */ }
       return next;
     });
+  };
+
+  const handleSwitchToLogin = (emailToUse?: string) => {
+    if (emailToUse) {
+      setLoginPrefilledEmail(emailToUse);
+    }
+    setTab("login");
   };
 
   // Redirect if already logged in
@@ -1233,13 +1291,18 @@ function AuthPageInner() {
         </div>
 
         {tab === "login" ? (
-          <LoginForm key="login" onSuccess={handleSuccess} />
+          <LoginForm
+            key="login"
+            onSuccess={handleSuccess}
+            initialEmail={loginPrefilledEmail}
+          />
         ) : (
           <RegisterForm
             key="register"
             onSuccess={handleSuccess}
             savedState={registerState}
             onStateChange={handleRegisterStateChange}
+            onSwitchToLogin={handleSwitchToLogin}
           />
         )}
       </div>

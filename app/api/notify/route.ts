@@ -80,6 +80,11 @@ export async function POST(req: NextRequest) {
 
   let savedOrderId: string | null = null;
 
+  const telegramChatIds = [
+    process.env.TELEGRAM_CHAT_ID,
+    process.env.TELEGRAM_CHAT_ID_2,
+  ].filter(Boolean);
+
   await Promise.all([
     fetch(`${backendUrl}/api/checkout`, {
       method: "POST",
@@ -95,14 +100,16 @@ export async function POST(req: NextRequest) {
         if (j?._id) savedOrderId = j._id;
       })
       .catch(e => console.error("[notify] save error:", e)),
-    fetch(
-      `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chat_id: process.env.TELEGRAM_CHAT_ID, text, reply_markup }),
-      }
-    ).then(r => r.json()).then(j => console.log("[notify] telegram response:", JSON.stringify(j))).catch(e => console.error("[notify] telegram error:", e)),
+    ...telegramChatIds.map(chat_id =>
+      fetch(
+        `https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chat_id, text, reply_markup }),
+        }
+      ).then(r => r.json()).then(j => console.log(`[notify] telegram(${chat_id}) response:`, JSON.stringify(j))).catch(e => console.error(`[notify] telegram(${chat_id}) error:`, e))
+    ),
   ]);
 
   return NextResponse.json({
