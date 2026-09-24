@@ -8,7 +8,10 @@ export async function GET(req: NextRequest) {
   const page = searchParams.get("page") || "1";
   const limit = searchParams.get("limit") || "10";
   const res = await fetch(`${BACKEND}/api/customers/orders?page=${page}&limit=${limit}`, {
-    headers: { cookie },
+    headers: {
+      cookie,
+      "x-internal-secret": process.env.INTERNAL_SECRET || "",
+    },
     cache: "no-store",
   });
   const data = await res.json();

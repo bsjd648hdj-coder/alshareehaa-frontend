@@ -8,7 +8,10 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     const cookie = req.headers.get("cookie") || "";
 
     const res = await fetch(`${BACKEND}/api/customers/orders/${encodeURIComponent(id)}`, {
-      headers: { cookie },
+      headers: {
+        cookie,
+        "x-internal-secret": process.env.INTERNAL_SECRET || "",
+      },
       cache: "no-store",
     });
 

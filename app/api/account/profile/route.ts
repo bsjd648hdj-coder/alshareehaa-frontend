@@ -16,6 +16,7 @@ export async function PATCH(req: NextRequest) {
       headers: {
         "Content-Type": "application/json",
         cookie,
+        "x-internal-secret": process.env.INTERNAL_SECRET || "",
       },
       body: JSON.stringify(body),
     });
