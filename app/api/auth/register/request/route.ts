@@ -63,7 +63,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "فشل إرسال بريد التحقق" }, { status: 500 });
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      cooldown: backendData.cooldown || 60,
+    });
   } catch (err) {
     console.error("register/request route error:", err);
     return NextResponse.json({ error: "خطأ في الخادم" }, { status: 500 });
