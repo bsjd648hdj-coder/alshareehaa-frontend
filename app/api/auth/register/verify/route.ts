@@ -27,7 +27,10 @@ export async function POST(req: NextRequest) {
 
     const backendRes = await fetch(`${BACKEND}/api/customers/auth/register/verify`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-internal-secret": process.env.INTERNAL_SECRET || "",
+      },
       body: JSON.stringify(payload),
     });
 
