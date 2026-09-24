@@ -7,6 +7,8 @@ const ALLOWED_HOSTS = [
   "backend-for-bsmastore-public-production-5e58.up.railway.app",
   "lamsa-simicard-backend.vercel.app",
   "lamsa-simicard-backend-production.up.railway.app",
+  "alshareehaa-backend.vercel.app",
+  "alshareehasim-backend.vercel.app",
   "alsharihaa.com",
   "www.alsharihaa.com",
 ];

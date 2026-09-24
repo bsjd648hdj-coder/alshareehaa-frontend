@@ -58,7 +58,8 @@ export async function POST(req: NextRequest) {
         subject: "رمز التحقق لإنشاء حسابك",
         html: otpEmailTemplate(otp),
       });
-    } catch {
+    } catch (emailErr) {
+      console.error("register/request sendEmail error:", emailErr);
       return NextResponse.json({ error: "فشل إرسال بريد التحقق" }, { status: 500 });
     }
 

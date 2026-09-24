@@ -10,7 +10,7 @@ const IDS = [
   "6a94389df64d29e186524b77",
 ];
 
-const BACKEND = process.env.BACKEND_URL || "https://lamsa-simicard-backend-production.up.railway.app";
+const BACKEND = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || "https://alshareehaa-backend.vercel.app";
 
 // Fix 7: request واحدة بدل 4 — /api/products/by-ids?ids=id1,id2,id3,id4
 async function getMostDemanded(): Promise<Product[]> {

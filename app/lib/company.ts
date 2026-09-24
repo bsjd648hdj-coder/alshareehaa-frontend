@@ -1,7 +1,7 @@
 const BACKEND =
   process.env.BACKEND_URL ||
   process.env.NEXT_PUBLIC_API_URL ||
-  "https://alshareehasim-backend.vercel.app";
+  "https://alshareehaa-backend.vercel.app";
 
 export interface CompanyData {
   logo?: string;
