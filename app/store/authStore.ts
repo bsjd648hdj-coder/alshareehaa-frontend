@@ -51,20 +51,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setLoading: (loading) => set({ loading }),
 
   fetchMe: async () => {
+    // Skip if already initialized — prevents redundant backend calls on every
+    // component mount.  The cross-tab storage listener below resets initialized
+    // when another tab logs out/in so this guard doesn't block those cases.
     if (get().initialized) return;
 
-    // عرض الـ cache فوراً لتجنب الـ flicker
+    // Show cached user immediately to avoid layout flicker
     const cached = readCache();
-    // سواء فيه cache أو لأ، نوقف الـ loading spinner فوراً
     set({ user: cached ?? null, loading: false });
 
     try {
       const res = await fetch("/api/auth/me");
       const data = await res.json();
-      const user = data.authenticated ? data.user : null;
+      const user = data.authenticated ? (data.user as AuthUser) : null;
       writeCache(user);
       set({ user, loading: false, initialized: true });
     } catch {
+      // Network error — keep cached value and mark initialized so the UI
+      // doesn't get stuck in a loading state.
       set({ user: cached ?? null, loading: false, initialized: true });
     }
   },
@@ -73,8 +77,29 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
     writeCache(null);
     try { sessionStorage.removeItem("auth_register_draft"); } catch { /* ignore */ }
-    // initialized: true عشان fetchMe ميشتغلش تاني بعد الـ logout
-    // الـ user = null كافي يخلي صفحة الـ auth تظهر فوراً
-    set({ user: null, initialized: true, loading: false });
+    // Reset initialized so fetchMe will re-verify on next visit/login attempt.
+    // This also makes the auth page show immediately without stale user data.
+    set({ user: null, initialized: false, loading: false });
   },
 }));
+
+// ─── Cross-tab sync ───────────────────────────────────────────────────────────
+// When the user logs in or out in another tab, the localStorage cache key
+// changes.  We listen for that event and re-run fetchMe so every open tab
+// stays in sync without requiring a page refresh.
+if (typeof window !== "undefined") {
+  window.addEventListener("storage", (event) => {
+    if (event.key !== CACHE_KEY) return;
+
+    const store = useAuthStore.getState();
+
+    if (!event.newValue) {
+      // Another tab cleared the cache → treat as logout
+      store.logout();
+    } else {
+      // Another tab wrote a new user → reset initialized so fetchMe re-runs
+      useAuthStore.setState({ initialized: false });
+      store.fetchMe();
+    }
+  });
+}
