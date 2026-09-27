@@ -48,6 +48,7 @@ export default async function Footer() {
             <p className="text-sm leading-7 text-gray-600 whitespace-pre-line">
               {c.details || "الشريحة الموثوقة - شرائح اتصال وإنترنت بأسعار منافسة، مع خدمة سريعة وآمنة ودعم عملاء مميز. ثقتكم غايتنا وخدمتكم أولويتنا"}
             </p>
+            {/* 
             <div className="flex flex-col gap-2">
               <a href="https://qr.saudibusiness.gov.sa/viewcr?nCrNumber=ZWAcF0Nm56G7jKRA+f4WCw==" target="_blank" rel="noreferrer"
                 className="flex items-center gap-2 group">
@@ -67,6 +68,7 @@ export default async function Footer() {
                 </div>
               </a>
             </div>
+            */}
           </div>
 
           {/* Contact details */}
