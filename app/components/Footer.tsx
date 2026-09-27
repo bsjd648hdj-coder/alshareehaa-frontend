@@ -32,7 +32,7 @@ export default async function Footer() {
     return "";
   }
 
-  const hasImages = qrSrc || footerItems.length > 0 || img1 || true; // VAT certificate is always shown
+  const hasImages = qrSrc || footerItems.length > 0 || img1; // || true; // VAT certificate is always shown
 
   return (
     <footer dir="rtl" className="mt-16 border-t border-gray-200" style={{ background: "#F3F4F6" }}>
@@ -131,6 +131,7 @@ export default async function Footer() {
                   ? <a href={link1} target="_blank" rel="noreferrer" className="shrink-0"><Image src={img1} alt="img1" width={200} height={200} className="rounded-lg h-auto w-auto max-h-20 md:max-h-24" /></a>
                   : <Image src={img1} alt="img1" width={200} height={200} className="rounded-lg shrink-0 h-auto w-auto max-h-20 md:max-h-24" />
                 )}
+                {/* 
                 <a
                   href="/شهادة تسجيل جديد في ضريبة القيمة المضافةPDF_260920_203336.pdf"
                   target="_blank"
@@ -145,6 +146,7 @@ export default async function Footer() {
                     className="rounded-lg h-auto w-auto max-h-20 md:max-h-24"
                   />
                 </a>
+                */}
               </div>
             )}
           </div>
