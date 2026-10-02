@@ -107,6 +107,18 @@ export default async function RootLayout({
   return (
     <html lang="ar" dir="rtl">
       <head>
+        <Script
+          src="https://www.googletagmanager.com/gtag/js?id=AW-18484617025"
+          strategy="afterInteractive"
+        />
+        <Script id="google-ads-tag" strategy="afterInteractive">
+          {`
+            window.dataLayer = window.dataLayer || [];
+            function gtag(){dataLayer.push(arguments);}
+            gtag('js', new Date());
+            gtag('config', 'AW-18484617025');
+          `}
+        </Script>
         <TikTokPixel />
       </head>
       <body className={`${cairo.className} antialiased`} suppressHydrationWarning>
