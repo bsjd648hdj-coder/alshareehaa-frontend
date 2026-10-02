@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Cairo } from "next/font/google";
 import Script from "next/script";
 import TikTokPixel from "./components/TikTokPixel";
-import SnapchatPixel from "./components/SnapchatPixel";
+import SnapPixel from "./components/SnapPixel";
 import "./globals.css";
 // leaflet/dist/leaflet.css نُقل إلى checkout/layout.tsx — لا علاقة له بباقي الصفحات
 import ClientLayout from "./components/ClientLayout";
@@ -110,8 +110,8 @@ export default async function RootLayout({
         <TikTokPixel />
       </head>
       <body className={`${cairo.className} antialiased`} suppressHydrationWarning>
+        <SnapPixel />
         <ClientLayout footer={<Footer />} whatsapp={c.whatsapp}>{children}</ClientLayout>
-        <SnapchatPixel />
         <div
           className="sbc-verify-seal"
           data-token="UGdEMHMvZm1nSlJGN0ZnVmpYZEF0UT09"
